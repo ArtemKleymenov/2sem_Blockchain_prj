@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Document</title>
+        <link rel="stylesheet" type="text/css" href="index.css">
+        <link rel="stylesheet" type="text/css" href="style.css">
+        <script src="./node_modules/web3/dist/web3.min.js"></script>
+        <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+        <script src="./re_abi.js"></script>
+        <script src="./get_balance_of.js"></script>
+    </head>
+    <body>
+        <div>
+            <h1>Do You Want To Buy Something</h1>
+            <p id="balance_holder"></p>
+            <button id="btn_main_page">Main Page</button>
+        </div>
+        <div id="goods"></div>
+        <script> 
+            const url_curr_user = "http://localhost:3000/curr_user.php";
+            const url_contract_usage = "http://localhost:3000/contract_usage.php";
+            const url_request_token = "http://localhost:3000/tokens_requests.php";
+            const url_predictions = "http://localhost:3000/predictions.php";
+
+            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+            const gas_cost = 3960375;
+            var uaddr = undefined;
+
+            var output = [];
+
+            async function requestRealEstate() {
+                console.log('uzver');
+                var t_id = $(this).attr('token_id');
+                console.log(uaddr);
+                await $.post(url_request_token, {
+                    tokenId : t_id,
+                    sender : uaddr
+                });
+                window.location.reload();
+            }
+            async function loadItems() {
+                var out = '';
+
+                await output.forEach(function(obj) {
+                    out += '<div class="single-item-taller btn-group">';
+                    out += '<h3>Cadastral '+obj.prop.cadastralNumber+'</h3>';
+                    out += '<p>URL: '+obj.prop.document+'</p>';
+                    out += '<p>'+obj.prop.cost+' Wei</p>';
+                    out += '<p>Prediction: '+obj.predict+' Wei</p>';
+                    //out += '<p>'+obj.prop.isSelling+'</p>';
+                    out += '<button style="width:100%" class=btn_req token_id="'+obj.idx+'">Request</button>';
+                    out += '</div>';
+                });
+                $('#goods').html(out);
+                $('body').on('click', '.btn_req', requestRealEstate);
+
+                balance = await getBalanceOf(uaddr);
+                var balance_holder = document.getElementById('balance_holder');
+                balance_holder.innerHTML = 'Balance: ' + String(balance);
+            }
+
+            async function collectItems() {
+                var address = await $.get(url_contract_usage, {contract: 'contract'});
+                uaddr = await $.get(url_curr_user, {curr_addr: 'curr_addr'});
+
+                var contract = new web3.eth.Contract(re_sm_abi, address);
+
+                var _max = await contract.methods.maxTokenId().call({from: uaddr, gas: gas_cost});
+                var idx = 1;
+                while(idx <= _max) {
+                    var req_again = await $.get(url_request_token, {
+                        tokid : idx,
+                        user : uaddr
+                    });
+                    console.log('req_again');
+                    console.log(req_again);
+                    if(req_again != 'true') {
+                        var prop = await contract.methods.propertyOf(idx).call({from: uaddr, gas: gas_cost});
+                        if(prop.isSelling) {
+                            var ret_val = await $.get(url_predictions, { tokenId : idx });
+                            var ret_json = JSON.parse(ret_val);
+                            
+                            var predict = undefined;
+                            if(ret_json != null) {
+                                predict = ret_json["predicted cost"]
+                            }
+                            output.push({prop, idx, predict});
+                        }
+                    }
+                    idx++;
+                }
+                await loadItems();
+            }
+
+            collectItems();
+            document.getElementById("btn_main_page").onclick = function () {
+                location.href = "./main_page.html";
+            };
+        </script>
+    </body>
+</html>

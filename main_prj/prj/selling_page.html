@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Document</title>
+        <link rel="stylesheet" type="text/css" href="index.css">
+        <script src="./node_modules/web3/dist/web3.min.js"></script>
+        <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+        <script src="./re_abi.js"></script>
+        <script src="./get_balance_of.js"></script>
+    </head>
+    <body>
+        <div>
+            <h1>GREETINGS, BIG BOSS!</h1>
+            <p id="balance_holder"></p>
+            <button id="btn_main_page">Main Page</button>
+
+            <label for="doc" class="col-lg-2 control-label">document (pdf)</label>
+            <input id="doc" type="text">
+            
+            <label for="lat" class="col-lg-2 control-label">latitude</label>
+            <input id="lat" type="number">
+            <label for="log" class="col-lg-2 control-label">longitude</label>
+            <input id="log" type="number">
+
+            <label for="btype" class="col-lg-2 control-label">type of building</label>
+            <select id="sel_btype">
+                <option value="1">New Building</option>
+                <option value="2">Secondary Building</option>
+            </select>
+
+            <label for="floor" class="col-lg-2 control-label">floor</label>
+            <input id="floor" type="number">
+            <label for="n_floor" class="col-lg-2 control-label">number of floors</label>
+            <input id="n_floor" type="number">
+
+            <label for="n_room" class="col-lg-2 control-label">rooms</label>
+            <input id="n_room" type="number">
+            <label for="plottage" class="col-lg-2 control-label">square (plottage)</label>
+            <input id="plottage" type="number">
+            
+            <label for="uprice" class="col-lg-2 control-label">your price (wei)</label>
+            <input id="uprice" type="number">
+
+            <label for="img" class="col-lg-2 control-label">image</label>
+            <input id="img" type="url">
+
+            <button id="btn_submit">I WANT MY MONEY $$$</button>
+
+        </div>
+        <script>
+            document.getElementById("btn_main_page").onclick = function () {
+                location.href = "./main_page.html";
+            };
+        </script>
+        <script>
+            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+            const gas_cost = 3960375;
+
+            const url_contract_usage = "http://localhost:3000/contract_usage.php";
+            const url_curr_user = "http://localhost:3000/curr_user.php";
+            const url_predict_api = "http://localhost:8000/predict";
+            const url_predictions = "http://localhost:3000/predictions.php";
+            
+            var address  = undefined;
+            var _login   = undefined;
+            var _pswd    = undefined;
+            var uaddr    = undefined;
+            var contract = undefined;
+
+            async function setGlobalVars() {
+                address  = await $.get(url_contract_usage, {contract: 'contract'});
+                _login   = await $.get(url_curr_user, {curr_login: 'curr_login'});
+                _pswd    = await $.get(url_curr_user, {curr_pswd: 'curr_pswd'});
+                uaddr    = await $.get(url_curr_user, {curr_addr: 'curr_addr'});
+                contract = new web3.eth.Contract(re_sm_abi, address);
+
+                balance = await getBalanceOf(uaddr);
+                var balance_holder = document.getElementById('balance_holder');
+                balance_holder.innerHTML = 'Balance: ' + String(balance);
+            }
+
+            async function sell_property_blockchain() {
+                var doc_url = document.getElementById("doc").value;
+                var price   = document.getElementById("uprice").value;
+
+                await contract.methods.constructToken(doc_url, price, _login, _pswd)
+                .send({from: uaddr, gas: gas_cost}).then(function(result, error){
+                    console.log(result);
+                });
+            }
+
+            async function predict_sell() {
+                var doc_url  = document.getElementById("doc").value;
+                var lat      = document.getElementById("lat").value;
+                var log      = document.getElementById("log").value;
+                var floor    = document.getElementById("floor").value;
+                var n_floor  = document.getElementById("n_floor").value;
+                var n_room   = document.getElementById("n_room").value;
+                var plottage = document.getElementById("plottage").value;
+                var uprice   = document.getElementById("uprice").value;
+                var img      = document.getElementById("img").value;
+                var obj_type = document.getElementById("sel_btype").value;
+                var reg = 1;
+                var res = await $.ajax({
+                    url: url_predict_api, 
+                    type: "POST",
+                    dataType: "json",
+                    contentType: "application/json; charset=utf-8",
+                    data: JSON.stringify({
+                            "geo_lat":     lat,
+                            "geo_lon":     log,
+                            "region":      reg,
+                            "level":       floor,
+                            "levels":      n_floor,
+                            "rooms":       n_room,
+                            "area":        plottage,
+                            "object_type": obj_type
+                    })
+                });
+                // NOTE: Race condtions. we don't really know the future ID
+                // only for local usage. NOT for product
+                var _max = await contract.methods.maxTokenId().call({from: uaddr, gas: gas_cost});
+                var tid = Number(_max) + 1;
+                var json_obj = {
+                        "geo_lat":     lat,
+                        "geo_lon":     log,
+                        "region":      reg,
+                        "level":       floor,
+                        "levels":      n_floor,
+                        "rooms":       n_room,
+                        "area":        plottage,
+                        "object_type": obj_type,
+                        "predicted cost" : res
+                };
+                await $.post(url_predictions, { tokenId : tid, json : json_obj }); 
+
+                return res;
+            }
+            
+            setGlobalVars();
+            document.getElementById("btn_submit").onclick = function () {
+                predict_sell().then(function(res) {
+                    console.log('prediction', res);
+                    sell_property_blockchain().then(function() {
+                        location.href = "./main_page.html";
+                    });
+                });
+            };
+
+            document.getElementById("btn_main_page").onclick = function () {
+                location.href = "./main_page.html";
+            };
+        </script>
+    </body>
+</html>

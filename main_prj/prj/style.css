@@ -1,0 +1,82 @@
+.single-item {
+    width: 200px;
+    height: 170px;
+    border: 1px solid black;
+    margin: 24px;
+    float: center;
+    text-align: center;
+}
+
+.single-item-wider {
+    width: 400px;
+    height: 230px;
+    border: 1px solid black;
+    margin: 10px;
+    float: center;
+    text-align: center;
+}
+
+.single-item-taller {
+    width: 200px;
+    height: 224px;
+    border: 1px solid black;
+    margin: 24px;
+    float: center;
+    text-align: center;
+}
+
+
+.single-item button {
+    display: block;
+    margin: 20px auto;
+}
+
+.btn_sell {
+    margin: 2em 0;
+    padding: 1em 4em;
+    display:block;
+    color:blue;
+}
+
+.btn_stop_sell {
+    margin: 2em 0;
+    padding: 1em 4em;
+    display:block;
+    color:brown;
+}
+
+.btn_req {
+    margin: 2em 0;
+    padding: 1em 4em;
+    display:block;
+}
+
+.btn_approve {
+    padding-left: 2em;
+    padding-right: 2em;
+    color: green;
+}
+
+.btn_decline {
+    padding-left: 2em;
+    padding-right: 2em;
+    color: red;
+}
+
+.btn_buy {
+    padding-left: 2em;
+    padding-right: 2em;
+    color:white;
+}
+
+.btn_refuse {
+    padding-left: 2em;
+    padding-right: 2em;
+    color: red;
+}
+
+
+/* group button */
+.btn-group {
+    float: left; /* Float the buttons side by side */
+}

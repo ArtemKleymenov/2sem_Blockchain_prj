@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Document</title>
+        <link rel="stylesheet" type="text/css" href="index.css">
+        <link rel="stylesheet" type="text/css" href="style.css">
+        <script src="./node_modules/web3/dist/web3.min.js"></script>
+        <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+        <script src="./re_abi.js"></script>
+        <script src="./get_balance_of.js"></script>
+    </head>
+    <body>
+        <div>
+            <h1>Personal account, Personal opportunities</h1>
+            <p id="balance_holder"></p>
+            <button id="btn_main_page">Main Page</button>
+        </div>
+        <div class="container" id="user_assets"></div>
+        <div class="container" id="user_offers"></div>
+        <div class="container" id="user_requests"></div>
+
+        <script>
+            const url_curr_user = "http://localhost:3000/curr_user.php";
+            const url_contract_usage = "http://localhost:3000/contract_usage.php";
+            const url_request_token = "http://localhost:3000/tokens_requests.php";
+
+            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+            const gas_cost = 3960375;
+            
+            var uaddr    = undefined;
+            var address  = undefined;
+            var contract = undefined;
+            var balance  = undefined;
+            async function loadAll() {
+                address = await $.get(url_contract_usage, {contract: 'contract'});
+                contract = await new web3.eth.Contract(re_sm_abi, address);
+                uaddr = await $.get(url_curr_user, {curr_addr: 'curr_addr'});
+                
+                balance = await getBalanceOf(uaddr);
+                var balance_holder = document.getElementById('balance_holder');
+                balance_holder.innerHTML = 'Balance: ' + String(balance);
+                console.log("CONTRACT");
+            }
+
+            // POST REQUESTS. LOAD DATA
+            // BEGIN
+            var user_assets = new Map();
+            async function getUserAssets() {
+                var res = await contract.methods.getAllTokens(uaddr).call({from: uaddr, gas: gas_cost});
+                for (const idx of res) {
+                    const prop = await contract.methods.propertyOf(idx).call({from: uaddr, gas: gas_cost});
+                    user_assets.set(idx, prop);
+                    console.log(user_assets);
+                }
+            }
+
+            var user_offers = [];
+            async function getUserOffers() {
+                for(let [key, value] of user_assets) {
+                    const res = await $.get(url_request_token, { tokenId : key });
+                    user_offers.push(JSON.parse(res));
+                }
+                console.log(user_offers);
+            }
+
+            var user_reqs = undefined;
+            async function getUserRequests() {
+                var res = await $.get(url_request_token, { sender : uaddr});
+                console.log('res');
+                user_reqs = JSON.parse(res);
+                console.log(user_reqs);
+            }
+            // END
+
+            // SHOW LOADED DATA
+            // BEGIN
+            async function sellRealEstate() {
+                var t_id = $(this).attr('token_id');
+                console.log('sell (tokenID)', t_id);
+                await contract.methods.startSelling(t_id).send({from: uaddr, gas: gas_cost});
+                
+                window.location.reload();
+            }
+            async function stopSellRealEstate() {
+                var t_id = $(this).attr('token_id');
+                console.log('STOP sell (tokenID)', t_id);
+                await contract.methods.stopSelling(t_id).send({from: uaddr, gas: gas_cost});
+
+                window.location.reload();
+            }
+            async function showUserAssets() {
+                var out = '<h2>My Assets</h2>';
+                for(let [key, value] of user_assets) {
+                    out += '<div class="single-item">';
+                    out += '<h3>Cadastral '+value.cadastralNumber+'</h3>';
+                    out += '<p>URL: '+value.document+'</p>';
+                    out += '<p>'+value.cost+' Wei</p>';
+
+                    if(value.isSelling == true)
+                        out += '<button class=btn_stop_sell token_id="'+key+'">Stop Selling</button>';
+                    else
+                        out += '<button class=btn_sell token_id="'+key+'">Sell</button>';
+                    out += '</div>';
+                }
+                $('#user_assets').html(out);
+                $('body').on('click', '.btn_sell', sellRealEstate);
+                $('body').on('click', '.btn_stop_sell', stopSellRealEstate);
+            }
+
+
+            async function approveBuyRealEstate() {
+                var t_id = $(this).attr('token_id');
+                var buyer = $(this).attr('sndr');
+                console.log('approve (tokenID)', t_id);
+                await $.post(url_request_token, { status : 'apv', whom : buyer, what : t_id });
+                await contract.methods.approve(buyer, t_id).send({from: uaddr, gas: gas_cost});
+
+                window.location.reload();
+            }
+            async function declineBuyRealEstate() {
+                var t_id = $(this).attr('token_id');
+                var buyer = $(this).attr('sndr');
+                console.log('decline (tokenID,whom)', t_id, buyer);
+                await $.post(url_request_token, { status : 'dec', whom : buyer, what : t_id });
+
+                window.location.reload();
+            }
+            async function showUserOffers() {
+                var out = '<h2>My Offers</h2>';
+                for(const one_token of user_offers) {
+                    for(const one_sender of one_token) {
+                        var obj = user_assets.get(one_sender.tokenid);
+
+                        out += '<div class="single-item-wider">';
+                        out += '<h3>Cadatral Number '+obj.cadastralNumber+'</h3>';
+                        out += '<p>URL: '+obj.document+'</p>';
+                        out += '<p>'+obj.cost+' Wei</p>';
+                        out += '<p>Sender: '+one_sender.sender+'</p>';
+
+                        if(one_sender.status == 'req') {
+                            out += '<button class="btn_approve btn-group" style="width:50%"'
+                            +' token_id="'+one_sender.tokenid+'" sndr="'+one_sender.sender+'">Approve</button>';
+                            out += '<button class="btn_decline btn-group" style="width:50%"'
+                            +' token_id="'+one_sender.tokenid+'" sndr="'+one_sender.sender+'">Decline</button>';
+                            out += '</div>';
+                        }
+                        else if (one_sender.status == 'dec') {
+                            out += '<button class="btn_approve btn-group" style="width:100%"'
+                            +' token_id="'+one_sender.tokenid+'" sndr="'+one_sender.sender+'">Approve</button>';
+                        }
+                        else if (one_sender.status == 'apv') {
+                            out += '<button class="btn_decline btn-group" style="width:100%"'
+                            +' token_id="'+one_sender.tokenid+'" sndr="'+one_sender.sender+'">Decline</button>';
+                            out += '</div>';
+                        }
+                    }
+                }
+
+                $('#user_offers').html(out);
+                $('body').on('click', '.btn_approve', approveBuyRealEstate);
+                $('body').on('click', '.btn_decline', declineBuyRealEstate);
+            }
+
+            
+            async function deleteRealEstateReq(_t_id, _sender) {
+                var r = await $.post(url_request_token, { delete_tok : _t_id, deleter : _sender });
+                window.location.reload();
+            }
+            async function buyRealEstate() {
+                var t_id = $(this).attr('token_id');
+                console.log('buy (tokenID)', t_id);
+                var owner = await contract.methods.ownerOf(t_id).call({from: uaddr, gas: gas_cost});
+                var prop = await contract.methods.propertyOf(t_id).call({from: uaddr, gas: gas_cost});
+                await contract.methods.safeTransferFrom(owner, uaddr, t_id).send({from: uaddr, gas: gas_cost, value: prop.cost});
+                deleteRealEstateReq(t_id, uaddr);
+            }
+            async function refuseBuyRealEstate() {
+                var t_id = $(this).attr('token_id');
+                console.log('refuse (tokenID)', t_id);
+                deleteRealEstateReq(t_id, uaddr);
+            }
+            async function showUserRequests() {
+                var out = '<h2>My Requests</h2>';
+                for(const req of user_reqs) {
+                    const prop = await contract.methods.propertyOf(req.tokenid).call({from: uaddr, gas: gas_cost});
+                    out += '<div class="single-item">';
+                    out += '<h3>Cadastral '+prop.cadastralNumber+'</h3>';
+                    out += '<p>URL: '+prop.document+'</p>';
+                    out += '<p>'+prop.cost+' Wei</p>';
+
+                    if(req.status == 'req')
+                        out += '<button disabled class="btn_buy btn-group" style="width:50%" token_id="'+req.tokenid+'">Buy</button>';
+                    else if (req.status == 'apv')
+                        out += '<button class="btn_buy btn-group" style="width:50%; background-color: teal" token_id="'+req.tokenid+'">Buy</button>';
+                    
+                    if(req.status == 'dec')
+                        out += '<button class="btn_refuse btn-group" style="width:100%"  token_id="'+req.tokenid+'">Refuse</button>';
+                    else
+                        out += '<button class="btn_refuse btn-group" style="width:50%"  token_id="'+req.tokenid+'">Refuse</button>';
+                    out += '</div>';
+                }
+
+                $('#user_requests').html(out);
+                $('body').on('click', '.btn_buy', buyRealEstate);
+                $('body').on('click', '.btn_refuse', refuseBuyRealEstate);
+            }
+            // END
+
+            loadAll().then(async function() {
+                await getUserAssets().then(() => { showUserAssets(); });
+                await getUserOffers().then(() => { showUserOffers(); });
+                await getUserRequests().then(() => { showUserRequests(); });
+            });
+
+            document.getElementById("btn_main_page").onclick = function () {
+                location.href = "./main_page.html";
+            };
+
+        </script>
+    </body>
+</html>

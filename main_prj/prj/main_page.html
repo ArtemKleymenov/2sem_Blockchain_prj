@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Document</title>
+        <link rel="stylesheet" type="text/css" href="index.css">
+        <script src="./node_modules/web3/dist/web3.min.js"></script>
+        <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+        <script src="./get_balance_of.js"></script>
+    </head>
+    <body>
+        <div>
+            <button id="buttonLogOut">logout</button>
+            <p style="text-align:right;" id="balance_holder"></p>
+            <button id="buttonPA" style="float: right;">personal account</button>
+            <h1>Choose One Pill</h1>
+            <img src="https://www.videvo.net/blog/wp-content/uploads/2022/08/the-matrix.jpg" height="300">
+            <button id="buttonBuy">buying</button>
+            <button id="buttonSell">selling</button>
+        </div>
+        <script> 
+            const url_curr_user = "http://localhost:3000/curr_user.php";
+
+            async function load() {
+                uaddr = await $.get(url_curr_user, {curr_addr: 'curr_addr'});
+                balance = await getBalanceOf(uaddr);
+                var balance_holder = document.getElementById('balance_holder');
+                balance_holder.innerHTML = 'Balance: ' + String(balance);
+            }
+
+            load();
+
+            document.getElementById("buttonLogOut").onclick = function () {
+                location.href = "./auth_page.html";
+            };
+            document.getElementById("buttonBuy").onclick = function () {
+                location.href = "./buying_page.html";
+            };
+            document.getElementById("buttonSell").onclick = function () {
+                location.href = "./selling_page.html";
+            };
+            document.getElementById("buttonPA").onclick = function () {
+                location.href = "./personal_acc_page.html";
+            };
+        </script>
+    </body>
+</html>

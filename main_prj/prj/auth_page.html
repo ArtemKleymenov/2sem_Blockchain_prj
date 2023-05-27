@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Document</title>
+        <link rel="stylesheet" type="text/css" href="index.css">
+        <script src="./node_modules/web3/dist/web3.min.js"></script>
+        <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+        <script src="./re_abi.js"></script>
+        <script type="text/javascript" src="./deploy_contract.js"></script>
+    </head>
+    <script type="text/javascript">
+        const url_curr_user_info = "http://localhost:3000/curr_user.php";
+        const url_set_curr_user  = "http://localhost:3000/user_session.php";
+        const url_contract_usage = "http://localhost:3000/contract_usage.php";
+
+        web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+        const gas_cost = 3960375;
+
+        let addr_list = [];
+        const url = 'http://localhost:3000/post_ganache_accs.php';
+
+        async function postAccounts() {
+            addr_list = await web3.eth.getAccounts();
+            var res = await $.post(url, { GanacheAccounts: addr_list });
+        }
+    </script>
+    <body>
+        <div class="Authentication">
+            <h1>RealEstate Super DApp</h1>
+            <label for="login" class="col-lg-2 control-label">login</label>
+            <input id="login" type="text">
+            <label for="pswd" class="col-lg-2 control-label">password</label>
+            <input id="pswd" type="text">
+            <button id="button" type="submit">Let's rock!</button>
+        </div>
+        <script type="text/javascript">
+            // best QnA EEEEVER 
+            // https://question-it.com/questions/11136707/kak-predotvratit-perezagruzku-posle-zaprosa-na-publikatsiju
+            $(document).ready(function(){
+                postAccounts();
+            });
+
+            async function postUserCredentials() {
+                var log_ = document.getElementById("login").value;
+                var pas_ = document.getElementById("pswd").value;
+                
+                var s = await $.post(url_set_curr_user, {
+                    LOGIN: log_,
+                    PASSWORD: pas_,
+                });
+
+                var is_ver = await $.get(url_curr_user_info, {is_ver : 'verified'});
+                console.log('is_ver');
+                console.log(is_ver);
+                if(!is_ver) {
+                    var address = await $.get(url_contract_usage, {contract: 'contract'});
+                    var contract = await new web3.eth.Contract(re_sm_abi, address);
+                    var uaddr = await $.get(url_curr_user_info, {curr_addr: 'curr_addr'});
+
+                    await contract.methods.verifyMe(log_, pas_).send({from: uaddr, gas: gas_cost});
+                    await $.post(url_curr_user_info, { verified : true });
+                }
+            }
+
+            async function deploy_local() {
+                var res = await deploy(re_sm_abi, re_sm_bytecode);
+            }
+            document.getElementById("button").onclick = async function () {
+                await deploy_local();
+                await postUserCredentials();
+                location.href = "./main_page.html";
+            };
+        </script>
+    </body>
+</html>
